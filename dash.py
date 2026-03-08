@@ -11,7 +11,7 @@ st.set_page_config(page_title="Marketing Dashboard Pro", layout="wide")
 st.markdown("""
 <style>
     .reportview-container {
-        background: #f0f2f6; /* لون خلفية فاتح ومريح */
+        background: #050404; /* لون خلفية فاتح ومريح */
     }
     .stMetric {
         background-color: #ffffff; /* خلفية بيضاء لكروت الأرقام */
@@ -118,4 +118,5 @@ if uploaded_file:
     except Exception as e:
         st.error(f"Error: {e}")
 else:
+
     st.info("👋 Welcome Ahmed! Please upload your CSV file in the sidebar.")
