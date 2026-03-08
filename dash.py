@@ -14,7 +14,7 @@ st.markdown("""
         background: #050404; /* لون خلفية فاتح ومريح */
     }
     .stMetric {
-        background-color: #ffffff; /* خلفية بيضاء لكروت الأرقام */
+        background-color: #050404; /* خلفية بيضاء لكروت الأرقام */
         padding: 10px;
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -120,3 +120,4 @@ if uploaded_file:
 else:
 
     st.info("👋 Welcome Ahmed! Please upload your CSV file in the sidebar.")
+
