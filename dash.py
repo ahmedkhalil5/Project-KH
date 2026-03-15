@@ -1,123 +1,139 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from io import BytesIO
-import matplotlib.pyplot as plt 
+from mistralai.client import MistralClient
+from mistralai.models.chat_completion import ChatMessage
 
 
-st.set_page_config(page_title="Marketing Dashboard Pro", layout="wide")
+# --- 1. إعدادات النظام ---
+st.set_page_config(page_title="AD-SHIELD PRO: MULTI-CURRENCY", layout="wide")
 
 
+# --- 2. إعدادات AI ---
+MISTRAL_API_KEY = "GQgcXZycQirade3Mk7ZN8C6yof7gykiD"
+
+
+# --- 3. التصميم (Style) ---
 st.markdown("""
 <style>
-    .reportview-container {
-        background: #050404; /* لون خلفية فاتح ومريح */
+    .stApp { background-color: #040509; color: #e0e6ed; }
+    .metric-card {
+        background: rgba(0, 242, 254, 0.05);
+        border: 1px solid #00f2fe;
+        padding: 20px; border-radius: 12px; text-align: center;
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
     }
-    .stMetric {
-        background-color: #050404; /* خلفية بيضاء لكروت الأرقام */
-        padding: 10px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
+    .scale-card { border-right: 5px solid #10b981; background: rgba(16, 185, 129, 0.1); padding: 15px; margin: 10px 0; border-radius: 8px; direction: rtl; }
+    .kill-card { border-right: 5px solid #ef4444; background: rgba(239, 68, 68, 0.1); padding: 15px; margin: 10px 0; border-radius: 8px; direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; color: #1E88E5;'>🚀 Campaign Intelligence Dashboard</h1>", unsafe_allow_html=True)
-st.markdown("---")
+
+# --- 4. الشريط الجانبي (التخصيص الكامل) ---
+st.sidebar.header("⚙️ Dashboard Settings")
 
 
-st.sidebar.header("📁 Data & Controls")
-uploaded_file = st.sidebar.file_uploader("Upload Facebook CSV", type="csv")
+# أ) اختيار العملة
+currency = st.sidebar.selectbox("اختر العملة (Currency)", ["EGP", "SAR", "AED", "USD", "KWD"])
 
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("🎯 Filters")
+# ب) اختيار الهدف الأساسي للعرض في الكروت
+display_metric = st.sidebar.selectbox("اختر الرقم المراد عرضه في الواجهة",
+    ["Purchase ROAS", "Checkouts", "Add to Cart (ATC)", "Leads", "Cost Per Result"])
+
+
+# ج) مدخلات الحاسبة
+product_price = st.sidebar.number_input(f"سعر المنتج ({currency})", value=200)
+target_goal_val = st.sidebar.number_input(f"الهدف المطلوب (Target {display_metric})", value=5.0)
+
+
+# --- 5. الواجهة الرئيسية ---
+st.title("⚡ AD-SHIELD")
+tabs = st.radio("OPERATIONAL MODE", ["📊 Dashboard", "🚀 Scaling Control", "🎨 Creative AI"], horizontal=True)
+
+
+uploaded_file = st.sidebar.file_uploader("📂 Drop Your Ads CSV", type="csv")
+
 
 if uploaded_file:
-    data = pd.read_csv(uploaded_file)
-    data.columns = [c.strip() for c in data.columns] 
-
-    try:
-       
-        clicks_col = [c for c in data.columns if 'Clicks (all)' in c][0]
-        spend_col = [c for c in data.columns if 'Amount spent' in c][0]
-        imp_col = [c for c in data.columns if 'Impressions' in c][0]
-        roas_col = [c for c in data.columns if 'ROAS' in c][0]
-        campaign_col = "Campaign name" # ثابت في شيتات فيسبوك
-
-       
-        data["CTR %"] = (data[clicks_col] / data[imp_col]) * 100
-        data["CPC"] = data[spend_col] / data[clicks_col]
-        
-        all_campaigns = data[campaign_col].unique().tolist()
-        selected_campaigns = st.sidebar.multiselect("Select Campaigns", all_campaigns, default=all_campaigns)
-        
-        
-        min_roas = float(data[roas_col].min())
-        max_roas = float(data[roas_col].max())
-        roas_range = st.sidebar.slider("Select ROAS Range", min_roas, max_roas, (min_roas, max_roas))
-
+    df = pd.read_csv(uploaded_file)
+    df.columns = [c.strip().lower() for c in df.columns]
    
-        filtered_data = data[
-            (data[campaign_col].isin(selected_campaigns)) & 
-            (data[roas_col] >= roas_range[0]) & 
-            (data[roas_col] <= roas_range[1])
-        ]
-
-        # ---
-        st.sidebar.markdown("---")
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            filtered_data.to_excel(writer, index=False, sheet_name='Filtered_Analysis')
-        st.sidebar.download_button("📥 Download Filtered Report", data=output.getvalue(), file_name="Marketing_Analysis.xlsx")
-
-        # --- --
-        st.markdown("### 📌 Key Performance Indicators")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("💰 Total Spend", f"{filtered_data[spend_col].sum():,.2f}")
-        m2.metric("🖱️ Total Clicks", f"{filtered_data[clicks_col].sum():,.0f}")
-        m3.metric("📈 Avg ROAS", f"{filtered_data[roas_col].mean():.2f}x")
-        m4.metric("🎯 Avg CTR", f"{filtered_data['CTR %'].mean():.2f}%")
-
-        st.markdown("---")
-
-        # --- 
-        st.markdown("### 📊 Visual Insights")
-        c1, c2 = st.columns(2)
-        
-        with c1:
-            #
-            fig1 = px.bar(filtered_data, x=campaign_col, y=roas_col, 
-                         title="ROAS by Campaign", 
-                         color=roas_col, color_continuous_scale='Blues')
-            fig1.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig1, use_container_width=True)
-            
-        with c2:
-            
-            fig2 = px.pie(filtered_data, values=spend_col, names=campaign_col, 
-                         title="Budget Distribution", hole=0.3)
-            st.plotly_chart(fig2, use_container_width=True)
-
+    try:
+        # البحث الديناميكي عن الأعمدة
+        spend_col = [c for c in df.columns if "spent" in c or "cost" in c][0]
+        name_col = [c for c in df.columns if "campaign" in c][0]
+        clicks_col = [c for c in df.columns if "clicks" in c][0]
+        imp_col = [c for c in df.columns if "impressions" in c][0]
        
-        st.markdown("### 🔍 Detailed Data Analysis")
-        
-        styled_df = filtered_data[[campaign_col, spend_col, clicks_col, "CTR %", "CPC", roas_col]].style.background_gradient(subset=[roas_col], cmap="YlGn")
-        st.dataframe(styled_df, use_container_width=True)
+        # تحديد عمود الأداء بناءً على اختيار المستخدم
+        if "roas" in display_metric.lower():
+            perf_col = [c for c in df.columns if "roas" in c or "return" in c][0]
+        elif "checkout" in display_metric.lower():
+            perf_col = [c for c in df.columns if "checkout" in c][0]
+        elif "cart" in display_metric.lower():
+            perf_col = [c for c in df.columns if "cart" in c or "atc" in c][0]
+        else:
+            perf_col = [c for c in df.columns if "result" in c or "lead" in c][0]
 
-        if st.sidebar.checkbox("Show AI Summary"):
-            st.markdown("---")
-            st.markdown("### 🤖 AI Automated Insights")
-            best_camp = filtered_data.loc[filtered_data[roas_col].idxmax()]
-            summary = f"""
-            * Your best performing campaign is **{best_camp[campaign_col]}** with a ROAS of **{best_camp[roas_col]:.2f}x**.
-            * Average CPC across filtered campaigns is **{filtered_data['CPC'].mean():.2f}**.
-            """
-            st.write(summary)
 
+        df['ctr'] = (df[clicks_col] / df[imp_col].replace(0, 1)) * 100
+       
     except Exception as e:
-        st.error(f"Error: {e}")
-else:
+        st.error(f"خطأ في قراءة الأعمدة: تأكد أن الملف يحتوي على بيانات {display_metric}")
+        st.stop()
 
-    st.info("👋 Welcome Ahmed! Please upload your CSV file in the sidebar.")
+
+    # --- TAB 1: Dashboard ---
+    if tabs == "📊 Dashboard":
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(f'<div class="metric-card"><h4>إجمالي الصرف</h4><h2>{currency} {df[spend_col].sum():,.0f}</h2></div>', unsafe_allow_html=True)
+        with c2:
+            st.markdown(f'<div class="metric-card"><h4>متوسط {display_metric}</h4><h2>{df[perf_col].mean():.2f}</h2></div>', unsafe_allow_html=True)
+        with c3:
+            st.markdown(f'<div class="metric-card"><h4>متوسط الـ CTR</h4><h2>{df["ctr"].mean():.2f}%</h2></div>', unsafe_allow_html=True)
+       
+        st.subheader(f"تحليل أداء {display_metric} لكل حملة")
+        fig = px.bar(df, x=name_col, y=perf_col, color=perf_col, template="plotly_dark")
+        fig.add_hline(y=target_goal_val, line_dash="dot", line_color="#00f2fe", annotation_text="Target")
+        st.plotly_chart(fig, use_container_width=True)
+
+
+    # --- TAB 2: Scaling Control ---
+    elif tabs == "🚀 Scaling Control":
+        st.header(f"توصيات بناءً على هدف: {display_metric}")
+       
+        # أزرار التحميل
+        col_dl1, col_dl2 = st.columns(2)
+        with col_dl1:
+            st.download_button("📥 تحميل التقرير CSV", df.to_csv(index=False).encode('utf-8-sig'), "AdShield_Report.csv", "text/csv")
+        with col_dl2:
+            st.info("💡 نصيحة: للتحميل PDF، استخدم اختصار (Ctrl+P) واختر Save as PDF لتقرير منسق.")
+
+
+        col_s, col_k = st.columns(2)
+        with col_s:
+            st.success("🟢 حملات للتوسع (Scale)")
+            for _, r in df[df[perf_col] >= target_goal_val].iterrows():
+                st.markdown(f'<div class="scale-card"><b>🚀 {r[name_col]}</b><br>{display_metric}: {r[perf_col]:.2f}<br>التوصية: زود الميزانية 20% فوراً.</div>', unsafe_allow_html=True)
+       
+        with col_k:
+            st.error("🔴 حملات محتاجة تعديل (Kill/Fix)")
+            for _, r in df[df[perf_col] < target_goal_val].iterrows():
+                st.markdown(f'<div class="kill-card"><b>💀 {r[name_col]}</b><br>{display_metric}: {r[perf_col]:.2f}<br>التوصية: افحص الإعلان أو وقف الحملة.</div>', unsafe_allow_html=True)
+
+
+    # --- TAB 3: Creative AI ---
+    elif tabs == "🎨 Creative AI":
+        st.header("توليد إعلانات ذكية")
+        lang = st.selectbox("اللغة", ["Egyptian Slang (عامية مصرية)", "Saudi Slang (عامية سعودية)", "English"])
+        camp = st.selectbox("اختر الحملة", df[name_col])
+        if st.button("Generate Copy ⚡"):
+            st.info("الـ AI يقوم بالكتابة بناءً على أهداف " + display_metric + " حالياً...")
+            # هنا تستدعي دالة الـ AI اللي عملناها سابقاً
+
+
+else:
+    st.info("يرجى رفع ملف CSV لبدء تشغيل غرفة العمليات.")
 
