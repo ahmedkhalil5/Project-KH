@@ -1,4 +1,4 @@
-mistralai
 streamlit
 pandas
 plotly
+mistralai
